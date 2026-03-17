@@ -17,6 +17,21 @@ import pandas as pd
 import pandas_ta as ta
 import google.generativeai as genai
 
+from rag_chat_pipeline import (
+    build_chat_knowledge_base,
+    retrieve_chat_documents,
+    generate_chat_answer_with_citations
+)
+
+
+from datetime import datetime
+from collections import defaultdict
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
 
 def _safe_float(value, default=None):
     """
@@ -81,9 +96,13 @@ def _get_gemini_model():
 def get_stock_data(ticker: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     try:
         df = yf.download(
-            ticker, period="5y", interval="1d",
-            progress=False, auto_adjust=True
+            ticker,
+            period="5y",
+            interval="1d",
+            progress=False,
+            auto_adjust=True
         )
+
         if df is None or df.empty:
             return pd.DataFrame(), {}
 
@@ -109,9 +128,69 @@ def get_stock_data(ticker: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
                 pass
             return "N/A"
 
+        def _safe_join_parts(*parts):
+            cleaned = [str(p).strip() for p in parts if p not in [None, "", "N/A"]]
+            return ", ".join(cleaned) if cleaned else "N/A"
+
+        def _extract_ceo_name(company_officers):
+            try:
+                if not company_officers:
+                    return "N/A"
+
+                # 先找 title 含 CEO / Chief Executive Officer
+                for officer in company_officers:
+                    title = str(officer.get("title", "")).lower()
+                    name = officer.get("name")
+                    if ("chief executive officer" in title or title == "ceo" or " ceo" in title or "ceo " in title):
+                        return name or "N/A"
+
+                # 次選：title 裡有 president and ceo 類型
+                for officer in company_officers:
+                    title = str(officer.get("title", "")).lower()
+                    name = officer.get("name")
+                    if "ceo" in title:
+                        return name or "N/A"
+
+                return "N/A"
+            except Exception:
+                return "N/A"
+
+        def _extract_cfo_name(company_officers):
+            try:
+                if not company_officers:
+                    return "N/A"
+
+                for officer in company_officers:
+                    title = str(officer.get("title", "")).lower()
+                    name = officer.get("name")
+                    if ("chief financial officer" in title or title == "cfo" or " cfo" in title or "cfo " in title):
+                        return name or "N/A"
+
+                for officer in company_officers:
+                    title = str(officer.get("title", "")).lower()
+                    name = officer.get("name")
+                    if "cfo" in title:
+                        return name or "N/A"
+
+                return "N/A"
+            except Exception:
+                return "N/A"
+
+        def _extract_founder(info_dict):
+            # Yahoo Finance 不一定穩定提供 founder，這裡保守處理
+            for key in ["founder", "Founders", "founders"]:
+                if key in info_dict and info_dict.get(key):
+                    return info_dict.get(key)
+            return "N/A"
+
+        company_officers = info.get("companyOfficers", []) or []
+
         fundamentals = {
             "Symbol": ticker.upper(),
             "Company Name": info.get("longName", ticker.upper()),
+            "CEO": _extract_ceo_name(company_officers),
+            "CFO": _extract_cfo_name(company_officers),
+            "Founder": _extract_founder(info),
             "P/E Ratio (TTM)": info.get("trailingPE"),
             "Revenue Growth (YoY)": info.get("revenueGrowth"),
             "Profit Margin": info.get("profitMargins"),
@@ -122,6 +201,15 @@ def get_stock_data(ticker: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
             "Industry": info.get("industry"),
             "Business Summary": info.get("longBusinessSummary"),
             "Website": info.get("website"),
+            "Headquarters": _safe_join_parts(
+                info.get("city"),
+                info.get("state"),
+                info.get("zip")
+            ),
+            "Country": info.get("country", "N/A"),
+            "Full Time Employees": info.get("fullTimeEmployees", "N/A"),
+            "Exchange": info.get("exchange", "N/A"),
+            "Currency": info.get("currency", "N/A"),
             "Data Source": "Yahoo Finance (yfinance)",
             "Data Period": f"5y (Until {datetime.now().strftime('%Y-%m-%d')})"
         }
@@ -132,6 +220,7 @@ def get_stock_data(ticker: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
                 fundamentals[key] = f"{val * 100:.2f}%"
 
         return df, fundamentals
+
     except Exception:
         return pd.DataFrame(), {}
 
@@ -871,59 +960,113 @@ def generate_docx_report(ticker, fundamentals, ai_content):
     stream.seek(0)
     return stream
 
+
+from datetime import datetime
+from collections import defaultdict
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+
+today = datetime.utcnow().strftime("%B %d, %Y")
+
+
+today = datetime.utcnow().strftime("%B %d, %Y")
+
 def get_ai_chat_response(ticker, question):
+    """
+    Chatbot answer pipeline with retrieval + inline citations.
+
+    Supports:
+    - static company facts: CEO, sector, industry, headquarters, business summary
+    - recent/live-ish evidence: latest market snapshot, recent news, options positioning
+    """
+    ticker = str(ticker or "").strip().upper()
+    question = str(question or "").strip()
+
+    if not ticker:
+        return "Please provide a stock ticker."
+
+    if not question:
+        return "Please enter a question."
 
     model = _get_gemini_model()
-
     if not model:
         return "Gemini API key missing."
 
-    # ASK AI only path: keep this lightweight and fully separate from
-    # the full investment-plan pipeline. No valuation, no options,
-    # no integrated report generation.
-    company_name = str(ticker).upper()
-    business_summary = ""
-    sector = ""
-    industry = ""
+    company_name = ticker
+    fundamentals = {}
+    df_price = None
+    df_financials = None
+    news_items = []
+    options_snap = {}
 
+    # 1) fetch evidence
     try:
-        _, fundamentals = get_stock_data(ticker)
+        df_price, fundamentals = get_stock_data(ticker)
         if fundamentals:
-            company_name = fundamentals.get("Company Name", company_name)
-            business_summary = fundamentals.get("Business Summary", "") or ""
-            sector = fundamentals.get("Sector", "") or ""
-            industry = fundamentals.get("Industry", "") or ""
+            company_name = fundamentals.get("Company Name", ticker) or ticker
     except Exception:
-        pass
-
-    prompt = f"""
-    You are a professional equity research assistant.
-
-    This is the ASK AI ONLY mode.
-    Your task is only to answer the user's company research question.
-
-    Strict rules:
-    1. Do NOT generate a full investment plan.
-    2. Do NOT perform valuation simulation.
-    3. Do NOT perform options or derivatives analysis unless the user explicitly asks.
-    4. Do NOT produce institutional execution plans.
-    5. Focus only on the company and the user's question.
-    6. If the available context is limited, say so clearly.
-
-    Stock ticker: {str(ticker).upper()}
-    Company name: {company_name}
-    Sector: {sector}
-    Industry: {industry}
-    Business summary: {business_summary}
-
-    User question:
-    {question}
-
-    Answer clearly and professionally.
-    """
+        fundamentals = {}
+        company_name = ticker
 
     try:
-        r = model.generate_content(prompt)
-        return r.text
+        df_financials = get_financial_statements(ticker)
+    except Exception:
+        df_financials = None
+
+    try:
+        news_items = get_recent_news(ticker, max_items=10) or []
+    except Exception:
+        news_items = []
+
+    try:
+        options_snap = get_options_snapshot(ticker) or {}
+    except Exception:
+        options_snap = {}
+
+    # 2) build retrieval KB
+    knowledge_base = build_chat_knowledge_base(
+        ticker=ticker,
+        fundamentals=fundamentals,
+        df_price=df_price,
+        df_financials=df_financials,
+        options_snap=options_snap,
+        news_items=news_items
+    )
+
+    if not knowledge_base:
+        return (
+            f"I could not build a retrieval context for {ticker}. "
+            f"Please verify the ticker symbol and try again."
+        )
+
+    # 3) retrieve relevant docs
+    retrieved_docs = retrieve_chat_documents(
+        user_query=question,
+        ticker=ticker,
+        company_name=company_name,
+        knowledge_base=knowledge_base,
+        top_k=5
+    )
+
+    if not retrieved_docs:
+        return (
+            f"I could not retrieve relevant evidence for your question about {ticker}. "
+            f"Please try a more specific question."
+        )
+
+    # 4) grounded answer
+    try:
+        return generate_chat_answer_with_citations(
+            model=model,
+            ticker=ticker,
+            company_name=company_name,
+            question=question,
+            retrieved_docs=retrieved_docs,
+            today=today
+        )
     except Exception as e:
         return f"AI Error: {e}"
