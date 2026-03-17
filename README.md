@@ -1,401 +1,310 @@
+# StockMaster
 
-# StockMaster – AI-Powered Stock Analysis Dashboard
+### AI-Powered Stock Research & Investment Analysis Platform
 
-## Overview
-StockMaster is an AI-powered U.S. stock analysis dashboard built with **Python, Dash, and Plotly**.  
-It integrates market data retrieval, financial statement analysis, technical indicators, valuation scenario simulation, news sentiment analysis, AI-generated investment commentary, and automated report export into a single workflow.
+StockMaster is an AI-powered equity research dashboard that integrates
+financial data analysis, news sentiment intelligence, valuation
+simulation, and Retrieval-Augmented Generation (RAG) AI reasoning into a
+single application.
 
-The system allows a user to input a stock ticker and automatically generate a **structured investment research view** similar to an institutional equity research report.
+The system allows users to generate institutional-style investment
+research views directly from a stock ticker using automated data
+pipelines and AI analysis.
 
----
+------------------------------------------------------------------------
 
 # Problem & Motivation
 
-Modern stock research workflows are fragmented. Analysts typically must switch between multiple tools to complete a single analysis:
+Modern stock research workflows are fragmented. Analysts often rely on
+multiple tools to complete a single analysis:
 
-- market data platforms
-- financial statement databases
-- charting software
-- news sources
-- spreadsheet models
-- document editors
+-   financial databases
+-   charting platforms
+-   news terminals
+-   spreadsheet models
+-   document editors
 
-This workflow is slow, manual, and inconsistent.
+This leads to several issues:
 
-Key problems include:
+1.  Fragmented financial data across platforms
+2.  Manual research synthesis
+3.  Lack of automated insights
+4.  Weak connection between quantitative metrics and qualitative signals
+    such as news sentiment
 
-1. **Fragmented financial data**
-   - Market prices, fundamentals, and financial statements exist across multiple platforms.
+StockMaster integrates data retrieval, analytics, and AI reasoning into
+a unified workflow.
 
-2. **Disconnect between quantitative and qualitative analysis**
-   - Traditional dashboards process numeric financial metrics but ignore narrative market signals such as news sentiment.
+------------------------------------------------------------------------
 
-3. **Lack of automated research generation**
-   - Most financial dashboards visualize data but do not produce structured research insights.
+# System Architecture
 
-StockMaster addresses these issues by combining **data retrieval, analytics, and AI reasoning** into one integrated application.
+User Input (Ticker / Question) ↓ Data Retrieval Layer ↓ Financial
+Processing Layer ↓ Valuation Simulation Engine ↓ News Sentiment Analysis
+↓ RAG AI Reasoning Layer ↓ Interactive Dashboard ↓ Automated Investment
+Report
 
----
-
-# Solution Overview
-
-The system architecture combines several layers:
-
-### 1. Data Retrieval Layer
-Market data is retrieved using:
-
-- `yfinance` API for historical stock prices
-- company fundamentals
-- financial statements
-
-### 2. Data Processing Layer
-Financial data is processed using:
-
-- `pandas` for data cleaning and transformation
-- `pandas_ta` for technical indicator calculations
-
-### 3. AI Analysis Layer
-The system integrates **Google Gemini** to interpret financial signals and generate institutional-style investment commentary.
-
-The AI analysis uses:
-
-- company fundamentals
-- simulated valuation scenarios
-- news sentiment signals
-- options market context
-
-### 4. Interactive Dashboard
-The frontend is built using:
-
-- **Dash**
-- **Plotly visualizations**
-- **Bootstrap layout styling**
-
-Users can explore financial data, technical indicators, and AI analysis interactively.
-
----
+------------------------------------------------------------------------
 
 # Core Features
 
 ## 1. Stock Data Retrieval
 
-The backend retrieves historical market data and fundamentals including:
+The system retrieves market data using the **yfinance API** including:
 
-- P/E Ratio (TTM)
-- Revenue Growth
-- Profit Margin
-- ROE
-- Debt / Equity
-- Market Cap
-- Sector
-- Industry
+-   historical prices
+-   company fundamentals
+-   valuation metrics
+-   sector and industry information
 
-This is implemented through the function:
+Function: `get_stock_data()`
 
-```
-get_stock_data()
-```
-
----
+------------------------------------------------------------------------
 
 ## 2. Financial Statement Analysis
 
-The system extracts key income statement data:
+Financial statements are parsed and standardized into **Million USD
+units**.
 
-- Total Revenue
-- Gross Profit
-- Operating Income
-- Net Income
+Metrics extracted:
 
-Data is transformed into a **clean yearly P&L table (Million USD)** and visualized as a revenue vs. net income trend chart.
+-   Total Revenue
+-   Gross Profit
+-   Operating Income
+-   Net Income
 
-Function:
+Function: `get_financial_statements()`
 
-```
-get_financial_statements()
-```
-
----
+------------------------------------------------------------------------
 
 ## 3. Technical Analysis Dashboard
 
-The dashboard visualizes stock price movements using:
+Technical indicators calculated using **pandas-ta**:
 
-- Candlestick chart
-- Moving averages
+-   MA(5)
+-   MA(20)
+-   MA(60)
+-   MA(90)
+-   MA(248)
 
-Indicators displayed:
+Visualizations include:
 
-- MA(5)
-- MA(20)
-- MA(60)
-- MA(90)
-- MA(248)
+-   candlestick chart
+-   moving average overlays
+-   trend analysis
 
-These indicators help identify short‑term and long‑term market trends.
-
----
+------------------------------------------------------------------------
 
 ## 4. Valuation Scenario Simulation
 
-The backend includes a rule-based valuation engine that evaluates the stock using:
+A rule-based valuation engine evaluates companies using:
 
-- P/E ratio
-- revenue growth
-- profit margin
-- market capitalization
-- leverage
-- sector / industry context
-- news sentiment
+-   P/E ratio
+-   revenue growth
+-   profit margin
+-   market capitalization
+-   leverage
+-   sector context
+-   news sentiment
 
-The model produces three forward scenarios:
+Three price scenarios are produced:
 
-- **Bullish scenario**
-- **Base scenario**
-- **Bearish scenario**
-
-Functions:
-
-```
-dynamic_valuation_model()
-simulated_valuation()
-```
-
----
-
-## 5. News Sentiment Integration
-
-Recent news headlines are collected and analyzed with a sentiment scoring system.
-
-The sentiment logic:
-
-1. Headlines are classified as positive / neutral / negative.
-2. Sentiment weights are assigned.
-3. Scores are aggregated.
-4. Final sentiment is capped to avoid extreme distortion.
+-   Bullish
+-   Neutral
+-   Bearish
 
 Functions:
 
-```
-get_recent_news()
-summarize_news_sentiment()
-```
+-   `dynamic_valuation_model()`
+-   `simulated_valuation()`
 
-This connects **market narratives** with valuation results.
+------------------------------------------------------------------------
 
----
+## 5. News Sentiment Intelligence
 
-## 6. AI Investment Plan Generation
+Recent news headlines are analyzed to determine sentiment.
 
-The system uses **Google Gemini** to generate a structured investment analysis.
+Sentiment classification:
 
-The prompt integrates:
+Positive = +1\
+Neutral = 0\
+Negative = -1
 
-- company fundamentals
-- scenario valuation anchors
-- recent news context
-- options snapshot
-- sentiment explanation
+Aggregated scores influence valuation scenarios.
 
-Function:
+Functions:
 
-```
-get_ai_investment_plan()
-```
+-   `get_recent_news()`
+-   `summarize_news_sentiment()`
 
-The output resembles an **institutional investment memo**.
+------------------------------------------------------------------------
 
----
+# RAG-Based AI Analysis Engine
 
-## 7. AI Stock Chatbot
+StockMaster includes a Retrieval-Augmented Generation system.
 
-Users can ask follow‑up questions about the selected stock using a built‑in chatbot.
+Pipeline:
+
+User Question\
+↓\
+Query Expansion\
+↓\
+Document Retrieval\
+↓\
+Context Assembly\
+↓\
+LLM Reasoning\
+↓\
+Cited Answer
+
+Functions:
+
+-   `build_chat_knowledge_base()`
+-   `retrieve_chat_documents()`
+-   `generate_chat_answer_with_citations()`
+
+------------------------------------------------------------------------
+
+# AI Investment Plan Generator
+
+Google Gemini is used to generate structured investment analysis using:
+
+-   company fundamentals
+-   valuation scenarios
+-   financial signals
+-   sentiment analysis
+
+Function: `get_ai_investment_plan()`
+
+The output resembles a professional equity research memo.
+
+------------------------------------------------------------------------
+
+# AI Stock Chatbot
+
+Users can ask follow-up questions about a selected ticker.
 
 Example questions:
 
-- “What are the key risks for this company?”
-- “Explain the growth drivers.”
-- “How does sentiment affect the price scenarios?”
+-   What are the key risks of this company?
+-   Explain the growth drivers.
+-   How does sentiment affect the valuation scenarios?
+-   What is the company's business model?
 
-This provides quick contextual Q&A on the selected ticker.
+The chatbot answers using the RAG pipeline.
 
----
+------------------------------------------------------------------------
 
-## 8. DOCX Report Export
+# DOCX Report Export
 
-The dashboard can export a **professional investment report** in `.docx` format.
+The system can export a professional research report in `.docx` format.
 
-The exported report includes:
+The report includes:
 
-- company fundamentals
-- AI-generated investment commentary
-- structured report sections
-- disclaimer
+-   company fundamentals
+-   financial analysis
+-   valuation scenarios
+-   AI-generated commentary
+-   risk discussion
 
-Function:
+Function: `generate_docx_report()`
 
-```
-generate_docx_report()
-```
-
----
+------------------------------------------------------------------------
 
 # Project Structure
 
-```
-.
-├── stock_master_app_fixed.py
-├── stock_data_utils_fixed.py
-├── run_dashboard.bat
+StockMaster/
+
+├── stock_master_app_fixed.py\
+├── stock_data_utils_fixed.py\
+├── rag_chat_pipeline.py\
+├── run_dashboard.bat\
 └── README.md
-```
 
-### stock_master_app_fixed.py
+------------------------------------------------------------------------
 
-Main Dash application.
+# Technology Stack
 
-Responsibilities:
+Frontend
 
-- dashboard layout
-- charts and tables
-- callbacks
-- chatbot integration
-- AI report display
-- DOCX export
+-   Dash
+-   Plotly
+-   Bootstrap
 
----
+Backend
 
-### stock_data_utils_fixed.py
+-   Python
+-   pandas
+-   yfinance
+-   pandas-ta
+-   requests
 
-Backend analytics module.
+AI / NLP
 
-Responsibilities:
+-   Google Gemini
+-   Retrieval-Augmented Generation
+-   TF-IDF similarity ranking
 
-- market data retrieval
-- financial statement parsing
-- valuation simulation
-- news sentiment scoring
-- AI investment analysis
-- DOCX report generation
+Report Generation
 
----
+-   python-docx
 
-### run_dashboard.bat
-
-Windows launcher script.
-
-Typical use:
-
-- install dependencies
-- start the Dash server
-- open the dashboard locally
-
----
-
-# Tech Stack
-
-## Frontend
-- Dash
-- Plotly
-- Bootstrap
-
-## Backend
-- Python
-- pandas
-- yfinance
-- pandas_ta
-- requests
-
-## AI / NLP
-- Google Gemini
-- Prompt-based reasoning
-- TF-IDF similarity ranking
-
-## Export
-- python-docx
-
----
+------------------------------------------------------------------------
 
 # Workflow
 
-1. User enters a stock ticker.
-2. Market data and fundamentals are retrieved.
-3. Technical indicators are calculated.
-4. Financial statements are visualized.
-5. Valuation scenarios are simulated.
-6. Recent news is analyzed for sentiment.
-7. Gemini generates an investment plan.
-8. User can ask follow-up questions.
-9. Report can be exported to DOCX.
+1.  User enters a stock ticker.
+2.  Market data and fundamentals are retrieved.
+3.  Financial statements are processed.
+4.  Technical indicators are calculated.
+5.  Valuation scenarios are simulated.
+6.  News sentiment is analyzed.
+7.  AI generates investment insights.
+8.  User can ask follow-up questions.
+9.  Report can be exported to DOCX.
 
----
+------------------------------------------------------------------------
 
 # Installation
 
-Install required packages:
+pip install dash plotly pandas yfinance pandas-ta requests
+google-generativeai python-docx scikit-learn
 
-```bash
-pip install dash plotly pandas yfinance pandas-ta requests google-generativeai python-docx scikit-learn
-```
-
----
+------------------------------------------------------------------------
 
 # Environment Variables
 
-Required:
-
-```
-GEMINI_API_KEY=your_api_key
+GEMINI_API_KEY=your_api_key\
 NEWS_API_KEY=your_news_api_key
-```
 
-If the Gemini key is missing, AI analysis will not run.
-
----
+------------------------------------------------------------------------
 
 # Running the Application
 
-### Option 1
-
-```
 python stock_master_app_fixed.py
-```
 
-### Option 2
+or
 
-```
 run_dashboard.bat
-```
 
-Then open:
+Open:
 
-```
 http://127.0.0.1:8050/
-```
 
----
-
-# Current Limitations
-
-- News sentiment is rule-based.
-- Valuation engine is scenario-based rather than full financial modeling.
-- RAG retrieval is lightweight (TF-IDF) instead of vector database.
-
----
+------------------------------------------------------------------------
 
 # Future Improvements
 
-Potential upgrades:
+-   Vector database RAG
+-   Hybrid retrieval
+-   Portfolio analytics
+-   Multi-stock comparison
+-   Options analytics
+-   Rich DOCX export with charts
 
-- vector database RAG system
-- advanced news sentiment models
-- portfolio analytics
-- multi-stock comparison
-- deeper options analysis
-- richer DOCX export with charts
-
----
+------------------------------------------------------------------------
 
 # Disclaimer
 
-This project is for research and educational purposes only and does not constitute investment advice.
+This project is for research and educational purposes only and does not
+constitute investment advice.
